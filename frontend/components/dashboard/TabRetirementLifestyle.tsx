@@ -76,6 +76,108 @@ function scaleGoalToTarget(goal: RetirementLifestyle, targetMonthly: number): Re
   };
 }
 
+const COL_TIERS = [
+  {
+    label: 'High Cost of Living',
+    examples: 'NYC, SF Bay Area, Boston, LA, Seattle, DC',
+    minimum: 4500,
+    comfortable: 7000,
+    color: 'red',
+  },
+  {
+    label: 'Medium Cost of Living',
+    examples: 'Atlanta, Denver, Austin, Chicago, Portland, Nashville',
+    minimum: 3000,
+    comfortable: 5000,
+    color: 'yellow',
+  },
+  {
+    label: 'Low Cost of Living',
+    examples: 'Rural areas, smaller cities in the South/Midwest, international (Mexico, Portugal, Thailand)',
+    minimum: 1800,
+    comfortable: 3200,
+    color: 'green',
+  },
+];
+
+function CostOfLivingCheck({ monthlyBudget }: { monthlyBudget: number }) {
+  if (monthlyBudget <= 0) return null;
+
+  // Determine which tiers the budget fits
+  const viable = COL_TIERS.filter((t) => monthlyBudget >= t.minimum);
+  const comfortable = COL_TIERS.filter((t) => monthlyBudget >= t.comfortable);
+  const belowAll = viable.length === 0;
+
+  const colorClasses: Record<string, { bg: string; border: string; text: string; dot: string }> = {
+    red: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', dot: 'bg-red-500' },
+    yellow: { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700', dot: 'bg-yellow-500' },
+    green: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', dot: 'bg-green-500' },
+  };
+
+  return (
+    <div className={`rounded-xl border-2 p-5 ${belowAll ? 'bg-red-50 border-red-300' : 'bg-white border-gray-200'}`}>
+      <p className="text-sm font-semibold text-gray-700 mb-3">
+        Can you live on {formatMoney(monthlyBudget)}/mo?
+      </p>
+
+      {belowAll && (
+        <div className="bg-red-100 border border-red-300 rounded-lg p-3 mb-3">
+          <p className="text-sm text-red-800 font-medium">
+            {formatMoney(monthlyBudget)}/mo is below the minimum livable budget in most US areas.
+            Even in the lowest cost-of-living areas, a single person typically needs at least ~$1,800/mo
+            for basic housing, food, and healthcare. Consider adjusting your savings plan or retirement timeline.
+          </p>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {COL_TIERS.map((tier) => {
+          const c = colorClasses[tier.color];
+          const isViable = monthlyBudget >= tier.minimum;
+          const isComfortable = monthlyBudget >= tier.comfortable;
+
+          return (
+            <div
+              key={tier.label}
+              className={`flex items-center gap-3 rounded-lg p-3 ${isViable ? c.bg : 'bg-gray-50'} ${isViable ? c.border : 'border-gray-200'} border`}
+            >
+              <div className={`w-3 h-3 rounded-full flex-shrink-0 ${isViable ? c.dot : 'bg-gray-300'}`} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className={`text-sm font-medium ${isViable ? c.text : 'text-gray-400'}`}>
+                    {tier.label}
+                  </p>
+                  {isComfortable && (
+                    <span className="text-[10px] font-semibold bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                      COMFORTABLE
+                    </span>
+                  )}
+                  {isViable && !isComfortable && (
+                    <span className="text-[10px] font-semibold bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">
+                      TIGHT
+                    </span>
+                  )}
+                  {!isViable && (
+                    <span className="text-[10px] font-semibold bg-red-100 text-red-700 px-1.5 py-0.5 rounded">
+                      NOT VIABLE
+                    </span>
+                  )}
+                </div>
+                <p className={`text-xs ${isViable ? 'text-gray-500' : 'text-gray-400'}`}>
+                  {tier.examples}
+                </p>
+                <p className={`text-xs ${isViable ? 'text-gray-500' : 'text-gray-400'}`}>
+                  Min: {formatMoney(tier.minimum)}/mo &middot; Comfortable: {formatMoney(tier.comfortable)}/mo
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function TabRetirementLifestyle({ data, onSaved }: Props) {
   const { profile, expenses, debts, assets } = data;
 
@@ -293,6 +395,9 @@ export default function TabRetirementLifestyle({ data, onSaved }: Props) {
           </p>
         </div>
       )}
+
+      {/* Cost of living reality check */}
+      <CostOfLivingCheck monthlyBudget={predictedTotal} />
 
       {/* Side-by-side category editor */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
