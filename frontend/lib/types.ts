@@ -40,17 +40,51 @@ export interface Asset {
   balance: number;
 }
 
+export interface RetirementLifestyle {
+  id?: string;
+  profile_id?: string;
+  lifestyle_type: 'goal' | 'predicted';
+  housing_monthly: number;
+  food_monthly: number;
+  healthcare_monthly: number;
+  travel_annual: number;
+  leisure_monthly: number;
+  transportation_monthly: number;
+  utilities_monthly: number;
+  other_monthly: number;
+}
+
+export function lifestyleTotalMonthly(l: RetirementLifestyle): number {
+  return (
+    l.housing_monthly +
+    l.food_monthly +
+    l.healthcare_monthly +
+    l.leisure_monthly +
+    l.transportation_monthly +
+    l.utilities_monthly +
+    l.other_monthly +
+    l.travel_annual / 12
+  );
+}
+
 export interface FullProfile {
   profile: Profile;
   expenses: Expense[];
   debts: Debt[];
   assets: Asset[];
+  retirementLifestyles?: {
+    goal: RetirementLifestyle | null;
+    predicted: RetirementLifestyle | null;
+  };
 }
 
-export interface FireMilestone {
-  age: number | null;
-  target_amount: number;
-  achievable: boolean;
+export interface FireResult {
+  goal_fire_age: number | null;
+  goal_fire_target: number;
+  goal_achievable: boolean;
+  predicted_fire_age: number | null;
+  predicted_fire_target: number;
+  predicted_achievable: boolean;
 }
 
 export interface SimulationResult {
@@ -61,12 +95,7 @@ export interface SimulationResult {
     p75: { age: number; net_worth: number }[];
     p90: { age: number; net_worth: number }[];
   };
-  fire_milestones: {
-    lean_fire: FireMilestone;
-    coast_fire: FireMilestone;
-    barista_fire: FireMilestone;
-    fat_fire: FireMilestone;
-  };
+  fire_milestones: FireResult;
   retirement_readiness_score: number;
   gap_analysis: Record<string, any>;
 }

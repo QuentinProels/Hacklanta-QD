@@ -13,8 +13,8 @@ def run_simulation(
     monthly_savings_rate: float,
     employer_match_pct: float,
     safe_withdrawal_rate: float,
-    desired_monthly_retirement_income: float,
-    lean_monthly_expenses: float,
+    goal_monthly_retirement_income: float,
+    predicted_monthly_retirement_income: float,
     num_simulations: int = 1000,
 ) -> dict:
     """Run Monte Carlo simulation for FIRE projections."""
@@ -49,7 +49,6 @@ def run_simulation(
     all_paths[:, 0] = max(starting_nw, 0)
 
     # Track remaining debt separately — starts at total_debt and decreases
-    # We need this to properly model when debt is gone and surplus frees up
     remaining_debt = total_debt
 
     # Pre-generate random returns
@@ -73,10 +72,7 @@ def run_simulation(
         current_debt_payment = 0
         if remaining_debt > 0:
             current_debt_payment = monthly_debt_payments
-            # Simple amortization: assume payments reduce debt over time
-            # Use a conservative estimate — payments reduce balance directly
-            # (interest is already factored into minimum payments for most debts)
-            annual_principal_reduction = monthly_debt_payments * 12 * 0.6  # ~60% goes to principal
+            annual_principal_reduction = monthly_debt_payments * 12 * 0.6
             remaining_debt = max(0, remaining_debt - annual_principal_reduction)
         else:
             current_debt_payment = 0
@@ -88,12 +84,10 @@ def run_simulation(
 
         # If monthly net is negative, user is going deeper into debt — no investment growth
         if monthly_net < 0:
-            # Negative surplus: drain savings, no market growth
-            annual_drain = monthly_net * 12  # negative number
+            annual_drain = monthly_net * 12
             all_paths[:, y + 1] = np.maximum(all_paths[:, y] + annual_drain, 0)
         else:
             annual_savings = monthly_net * 12
-            # Only invested assets get market returns
             growth = all_paths[:, y] * (1 + returns[:, y])
             all_paths[:, y + 1] = np.maximum(growth + annual_savings, 0)
 
@@ -106,13 +100,9 @@ def run_simulation(
             for i, v in enumerate(pct_values)
         ]
 
-    # FIRE thresholds
-    lean_fire_target = 25 * lean_monthly_expenses * 12
-    fat_fire_target = 25 * desired_monthly_retirement_income * 12
-    coast_fire_target = fat_fire_target / ((1.07) ** (65 - current_age))
-    barista_fire_target = (
-        desired_monthly_retirement_income * 12 - 25000
-    ) / safe_withdrawal_rate
+    # FIRE targets (25x annual spending rule)
+    goal_fire_target = 25 * goal_monthly_retirement_income * 12
+    predicted_fire_target = 25 * predicted_monthly_retirement_income * 12
 
     # Find when median crosses each threshold
     median = np.percentile(all_paths, 50, axis=0)
@@ -123,65 +113,48 @@ def run_simulation(
                 return current_age + i
         return None
 
-    lean_age = find_crossing_age(lean_fire_target)
-    coast_age = find_crossing_age(coast_fire_target)
-    barista_age = find_crossing_age(barista_fire_target)
-    fat_age = find_crossing_age(fat_fire_target)
+    goal_age = find_crossing_age(goal_fire_target)
+    predicted_age = find_crossing_age(predicted_fire_target)
 
     fire_milestones = {
-        "lean_fire": {
-            "age": lean_age,
-            "target_amount": round(lean_fire_target, 2),
-            "achievable": lean_age is not None,
-        },
-        "coast_fire": {
-            "age": coast_age,
-            "target_amount": round(coast_fire_target, 2),
-            "achievable": coast_age is not None,
-        },
-        "barista_fire": {
-            "age": barista_age,
-            "target_amount": round(barista_fire_target, 2),
-            "achievable": barista_age is not None,
-        },
-        "fat_fire": {
-            "age": fat_age,
-            "target_amount": round(fat_fire_target, 2),
-            "achievable": fat_age is not None,
-        },
+        "goal_fire_age": goal_age,
+        "goal_fire_target": round(goal_fire_target, 2),
+        "goal_achievable": goal_age is not None,
+        "predicted_fire_age": predicted_age,
+        "predicted_fire_target": round(predicted_fire_target, 2),
+        "predicted_achievable": predicted_age is not None,
     }
 
-    # Retirement readiness score (0-100, based on proximity to coast fire)
+    # Retirement readiness score (0-100, based on proximity to predicted fire)
     current_nw = float(median[0])
-    if coast_fire_target > 0:
-        score = min(100, max(0, int((current_nw / coast_fire_target) * 100)))
+    if predicted_fire_target > 0:
+        score = min(100, max(0, int((current_nw / predicted_fire_target) * 100)))
     else:
         score = 0
 
-    # If coast fire is achievable, boost score based on how soon
-    if coast_age is not None:
-        years_to_coast = coast_age - current_age
-        if years_to_coast <= 5:
+    # If predicted fire is achievable, boost score based on how soon
+    if predicted_age is not None:
+        years_to_predicted = predicted_age - current_age
+        if years_to_predicted <= 5:
             score = max(score, 85)
-        elif years_to_coast <= 10:
+        elif years_to_predicted <= 10:
             score = max(score, 65)
-        elif years_to_coast <= 20:
+        elif years_to_predicted <= 20:
             score = max(score, 45)
 
-    # Gap analysis for fat fire by 50
+    # Gap analysis for goal fire by 50
     gap_analysis = {}
-    if fat_age is None or fat_age > 50:
-        gap_analysis["fat_fire_by_50"] = {
+    if goal_age is None or goal_age > 50:
+        gap_analysis["goal_fire_by_50"] = {
             "required_salary_by_age": {},
             "suggested_roles": ["Senior SWE", "Engineering Manager", "Director"],
         }
-        # Rough estimate of needed salary
         years_to_50 = max(1, 50 - current_age)
-        needed_annual_savings = (fat_fire_target - current_nw) / years_to_50
+        needed_annual_savings = (goal_fire_target - current_nw) / years_to_50
         needed_salary = (
             needed_annual_savings / 0.3 + monthly_expenses * 12
-        )  # assume 30% savings rate
-        gap_analysis["fat_fire_by_50"]["required_salary_by_age"] = {
+        )
+        gap_analysis["goal_fire_by_50"]["required_salary_by_age"] = {
             str(current_age + 5): round(needed_salary * 0.8),
             str(current_age + 10): round(needed_salary),
         }
