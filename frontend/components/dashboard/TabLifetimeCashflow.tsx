@@ -75,6 +75,8 @@ function computeCashflow(data: FullProfile): LifetimeCashflowPoint[] {
   const debtBalances: Record<string, number> = {};
   debts.forEach((d) => { debtBalances[d.id] = d.balance; });
 
+  const INVESTMENT_RETURN = 0.07; // matches Monte Carlo mean return
+
   const points: LifetimeCashflowPoint[] = [];
   let cumulativeSavings = startingNetWorth;
 
@@ -109,7 +111,10 @@ function computeCashflow(data: FullProfile): LifetimeCashflowPoint[] {
     const monthlyTakeHome = takeHome / 12;
     const monthlyMatch = employerMatch / 12;
     const netSavings = monthlyTakeHome + monthlyMatch - currentSpending - debtPayments;
-    cumulativeSavings += netSavings * 12; // accumulate annual
+
+    // Apply 7% investment return on positive portfolio balance, then add annual net flow
+    const investmentGrowth = cumulativeSavings > 0 ? cumulativeSavings * INVESTMENT_RETURN : 0;
+    cumulativeSavings += investmentGrowth + netSavings * 12;
 
     points.push({
       age,
