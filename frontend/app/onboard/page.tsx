@@ -89,17 +89,28 @@ export default function OnboardPage() {
   const salary = selectedLevel?.median || 0;
   const monthlyTakeHome = Math.round(salary * 0.72 / 12);
 
-  // Build salary progression points from career path starting at user's actual age
+  // Build salary progression points where each milestone compounds from the
+  // previous dot's salary (matching how CareerProgressionChart draws the line),
+  // then adds a 12% promotion bump — so dots always sit above the rising line.
   useEffect(() => {
     if (!selectedCareer || !selectedLevel) return;
+    const ANNUAL_RAISE = 0.035;
+    const PROMOTION_BUMP = 0.12;
     const currentLevelStartYears = selectedLevel.years_range[0];
-    const pts: SalaryPoint[] = selectedCareer.progression
-      .filter((_, i) => i >= levelIndex)
-      .map((level) => ({
-        age: currentAge + (level.years_range[0] - currentLevelStartYears),
-        salary: level.median,
-        label: level.level,
-      }));
+    const levels = selectedCareer.progression.filter((_, i) => i >= levelIndex);
+    const pts: SalaryPoint[] = [];
+    levels.forEach((level, i) => {
+      const age = currentAge + (level.years_range[0] - currentLevelStartYears);
+      if (i === 0) {
+        pts.push({ age, salary: level.median, label: level.level });
+      } else {
+        const prev = pts[i - 1];
+        const yearsBetween = age - prev.age;
+        const lineAtTransition = Math.round(prev.salary * Math.pow(1 + ANNUAL_RAISE, yearsBetween));
+        const salary = Math.max(level.median, Math.round(lineAtTransition * (1 + PROMOTION_BUMP)));
+        pts.push({ age, salary, label: level.level });
+      }
+    });
     setSalaryPoints(pts);
   }, [careerKey, levelIndex, currentAge]);
 
@@ -246,6 +257,9 @@ export default function OnboardPage() {
               onChange={setSalaryPoints}
               currentAge={currentAge}
             />
+            <p className="text-xs text-gray-400 mt-2 text-right">
+              Salaries shown in future nominal dollars (includes ~2% annual inflation)
+            </p>
           </div>
         )}
 

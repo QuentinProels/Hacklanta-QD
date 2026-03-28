@@ -53,10 +53,11 @@ export default function CareerProgressionChart({ points, onChange, currentAge, b
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // We store the Recharts internal coordinate system so we can map data <-> pixels
-  const chartLayoutRef = useRef<{
+  // We store only the pixel layout (left/right/top/bottom of the plot area).
+  // Domain values (min/max age/salary) are read live from component scope so
+  // dot positions update instantly when career path changes without waiting for DOM recapture.
+  const pixelLayoutRef = useRef<{
     left: number; right: number; top: number; bottom: number;
-    xMin: number; xMax: number; yMin: number; yMax: number;
   } | null>(null);
 
   // Compute chart domains (include benchmark salaries for Y range)
@@ -130,44 +131,41 @@ export default function CareerProgressionChart({ points, onChange, currentAge, b
     });
   });
 
-  // Capture the recharts plot area bounds from the CartesianGrid element
+  // Capture only the pixel layout of the plot area (stable across data changes).
   const captureChartBounds = useCallback(() => {
     if (!containerRef.current) return;
     const grid = containerRef.current.querySelector('.recharts-cartesian-grid');
     if (!grid) return;
     const containerRect = containerRef.current.getBoundingClientRect();
     const gridRect = grid.getBoundingClientRect();
-    chartLayoutRef.current = {
+    pixelLayoutRef.current = {
       left: gridRect.left - containerRect.left,
       right: gridRect.right - containerRect.left,
       top: gridRect.top - containerRect.top,
       bottom: gridRect.bottom - containerRect.top,
-      xMin: minAge,
-      xMax: maxAge,
-      yMin: minSalary,
-      yMax: maxSalary,
     };
-  }, [minAge, maxAge, minSalary, maxSalary]);
+  }, []);
 
-  // Recapture on resize
+  // Capture pixel layout on mount and resize only — domain values are read live.
   useEffect(() => {
     captureChartBounds();
     window.addEventListener('resize', captureChartBounds);
     return () => window.removeEventListener('resize', captureChartBounds);
-  }, [captureChartBounds, points]);
+  }, [captureChartBounds]);
 
-  // Also capture after first render / data change with a slight delay (recharts animation)
+  // Re-capture after first render (Recharts needs one paint to size the grid).
   useEffect(() => {
     const t = setTimeout(captureChartBounds, 100);
     return () => clearTimeout(t);
-  }, [captureChartBounds, interpolated.length]);
+  }, [captureChartBounds]);
 
-  // Map data coords to pixel coords relative to container
+  // Map data coords to pixel coords — domain values read live so dots reposition
+  // instantly when salary scale changes (e.g. switching career paths).
   const dataToPixel = (age: number, salary: number) => {
-    const layout = chartLayoutRef.current;
+    const layout = pixelLayoutRef.current;
     if (!layout) return { x: 0, y: 0 };
-    const xPct = (age - layout.xMin) / (layout.xMax - layout.xMin);
-    const yPct = (salary - layout.yMin) / (layout.yMax - layout.yMin);
+    const xPct = (age - minAge) / (maxAge - minAge);
+    const yPct = (salary - minSalary) / (maxSalary - minSalary);
     return {
       x: layout.left + xPct * (layout.right - layout.left),
       y: layout.bottom - yPct * (layout.bottom - layout.top),
@@ -175,13 +173,13 @@ export default function CareerProgressionChart({ points, onChange, currentAge, b
   };
 
   const pixelToData = (px: number, py: number) => {
-    const layout = chartLayoutRef.current;
+    const layout = pixelLayoutRef.current;
     if (!layout) return { age: currentAge, salary: 0 };
     const xPct = (px - layout.left) / (layout.right - layout.left);
     const yPct = 1 - (py - layout.top) / (layout.bottom - layout.top);
     return {
-      age: Math.round(layout.xMin + xPct * (layout.xMax - layout.xMin)),
-      salary: Math.round((layout.yMin + yPct * (layout.yMax - layout.yMin)) / 1000) * 1000,
+      age: Math.round(minAge + xPct * (maxAge - minAge)),
+      salary: Math.round((minSalary + yPct * (maxSalary - minSalary)) / 1000) * 1000,
     };
   };
 
@@ -203,7 +201,8 @@ export default function CareerProgressionChart({ points, onChange, currentAge, b
       const relX = e.clientX - containerRect.left;
       const relY = e.clientY - containerRect.top;
       const { age, salary } = pixelToData(relX, relY);
-      const clampedAge = Math.max(currentAge, Math.min(85, age));
+      const isFirstPoint = points[activeIndex].age === Math.min(...points.map((p) => p.age));
+      const clampedAge = isFirstPoint ? currentAge : Math.max(currentAge, Math.min(85, age));
 
       const updated = [...points];
       updated[activeIndex] = { ...updated[activeIndex], age: clampedAge, salary: Math.max(0, salary) };
@@ -234,7 +233,7 @@ export default function CareerProgressionChart({ points, onChange, currentAge, b
       const { age, salary } = pixelToData(relX, relY);
 
       // Don't add if outside plot area or too close to existing point
-      const layout = chartLayoutRef.current;
+      const layout = pixelLayoutRef.current;
       if (!layout) return;
       if (relX < layout.left || relX > layout.right || relY < layout.top || relY > layout.bottom) return;
       if (points.some((p) => Math.abs(p.age - age) < 2)) return;
@@ -317,6 +316,7 @@ export default function CareerProgressionChart({ points, onChange, currentAge, b
                 dot={false}
                 activeDot={false}
                 name="Your Path"
+                isAnimationActive={false}
               />
               {benchmarkLines.map((bl, idx) => (
                 <Line
@@ -329,6 +329,7 @@ export default function CareerProgressionChart({ points, onChange, currentAge, b
                   dot={false}
                   activeDot={false}
                   name={bl.label}
+                  isAnimationActive={false}
                 />
               ))}
               {benchmarkLines.length > 0 && <Legend wrapperStyle={{ fontSize: 12 }} />}
@@ -411,18 +412,6 @@ export default function CareerProgressionChart({ points, onChange, currentAge, b
                     style={{ pointerEvents: 'none' }}
                   >
                     {point.label || `Age ${point.age}`}
-                  </text>
-                  {/* Salary below dot */}
-                  <text
-                    x={pos.x}
-                    y={pos.y + r + 16}
-                    textAnchor="middle"
-                    fill="#6b7280"
-                    fontSize={11}
-                    fontWeight={500}
-                    style={{ pointerEvents: 'none' }}
-                  >
-                    {formatSalary(point.salary)}
                   </text>
                 </g>
               );
