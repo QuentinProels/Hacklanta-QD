@@ -75,7 +75,10 @@ function computeCashflow(data: FullProfile): LifetimeCashflowPoint[] {
   const debtBalances: Record<string, number> = {};
   debts.forEach((d) => { debtBalances[d.id] = d.balance; });
 
-  const INVESTMENT_RETURN = 0.07; // matches Monte Carlo mean return
+  // Use a conservative nominal return. 7% is the MC mean but produces infinite
+  // growth for well-funded profiles. 5% (~3% real after inflation) gives a
+  // more honest picture and allows portfolios to deplete when spending is high.
+  const INVESTMENT_RETURN = 0.05;
 
   const points: LifetimeCashflowPoint[] = [];
   let cumulativeSavings = startingNetWorth;
@@ -89,10 +92,16 @@ function computeCashflow(data: FullProfile): LifetimeCashflowPoint[] {
     const takeHome = grossIncome * 0.72;
     const employerMatch = grossIncome * (profile.employer_match_pct / 100);
 
-    // All values stored as MONTHLY for display
-    const currentSpending = isRetired ? predictedMonthly * inflationFactor : monthlyExpenses * inflationFactor;
-    const goalSpend = isRetired ? goalMonthly * inflationFactor : monthlyExpenses * inflationFactor;
-    const predictedSpend = isRetired ? predictedMonthly * inflationFactor : monthlyExpenses * inflationFactor;
+    // In retirement, spend whichever is LARGER: lifestyle target OR the
+    // SWR-implied draw (portfolio * SWR / 12). This prevents the portfolio
+    // from growing forever when someone is under-spending relative to their wealth.
+    const swr = profile.safe_withdrawal_rate > 0 ? profile.safe_withdrawal_rate : 0.04;
+    const swrMonthlyDraw = isRetired ? (cumulativeSavings * swr) / 12 : 0;
+    const baseRetirementSpend = Math.max(predictedMonthly, swrMonthlyDraw);
+
+    const currentSpending = isRetired ? baseRetirementSpend * inflationFactor : monthlyExpenses * inflationFactor;
+    const goalSpend = isRetired ? Math.max(goalMonthly, swrMonthlyDraw) * inflationFactor : monthlyExpenses * inflationFactor;
+    const predictedSpend = isRetired ? baseRetirementSpend * inflationFactor : monthlyExpenses * inflationFactor;
 
     // Debt payments (monthly) only during working years
     let debtPayments = 0;
@@ -112,7 +121,7 @@ function computeCashflow(data: FullProfile): LifetimeCashflowPoint[] {
     const monthlyMatch = employerMatch / 12;
     const netSavings = monthlyTakeHome + monthlyMatch - currentSpending - debtPayments;
 
-    // Apply 7% investment return on positive portfolio balance, then add annual net flow
+    // Apply investment return on positive portfolio, then add annual net flow
     const investmentGrowth = cumulativeSavings > 0 ? cumulativeSavings * INVESTMENT_RETURN : 0;
     cumulativeSavings += investmentGrowth + netSavings * 12;
 
