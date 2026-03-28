@@ -9,7 +9,6 @@ interface Props {
 }
 
 export default function FanChart({ data, currentAge }: Props) {
-  // Merge percentile data into a single array
   const chartData = data.percentiles.p50.map((point, i) => ({
     age: point.age,
     p10: data.percentiles.p10[i]?.net_worth || 0,
@@ -25,6 +24,9 @@ export default function FanChart({ data, currentAge }: Props) {
     return `$${value.toFixed(0)}`;
   };
 
+  const fm = data.fire_milestones;
+  const maxP90 = Math.max(...chartData.map((d) => d.p90));
+
   return (
     <div className="h-80">
       <ResponsiveContainer width="100%" height="100%">
@@ -36,25 +38,33 @@ export default function FanChart({ data, currentAge }: Props) {
             labelFormatter={(age) => `Age ${age}`}
           />
 
-          {/* Percentile bands - layered from widest to narrowest */}
+          {/* Percentile bands */}
           <Area type="monotone" dataKey="p90" stroke="none" fill="#dbeafe" fillOpacity={0.5} name="90th %ile" />
           <Area type="monotone" dataKey="p75" stroke="none" fill="#93c5fd" fillOpacity={0.5} name="75th %ile" />
           <Area type="monotone" dataKey="p50" stroke="#2563eb" strokeWidth={2} fill="#60a5fa" fillOpacity={0.3} name="Median" />
           <Area type="monotone" dataKey="p25" stroke="none" fill="#f0f9ff" fillOpacity={0.8} name="25th %ile" />
           <Area type="monotone" dataKey="p10" stroke="none" fill="#ffffff" fillOpacity={0.9} name="10th %ile" />
 
-          {/* FIRE threshold lines */}
-          {data.fire_milestones.lean_fire.achievable && (
-            <ReferenceLine y={data.fire_milestones.lean_fire.target_amount} stroke="#10b981" strokeDasharray="5 5" label={{ value: 'Lean', position: 'right', fontSize: 11 }} />
+          {/* Goal FIRE target line (amber) — show if within visible range */}
+          {fm.goal_fire_target < maxP90 * 1.5 && (
+            <ReferenceLine
+              y={fm.goal_fire_target}
+              stroke="#f59e0b"
+              strokeWidth={2}
+              strokeDasharray="8 4"
+              label={{ value: 'Goal FIRE', position: 'right', fontSize: 11, fill: '#b45309' }}
+            />
           )}
-          {data.fire_milestones.coast_fire.achievable && (
-            <ReferenceLine y={data.fire_milestones.coast_fire.target_amount} stroke="#3b82f6" strokeDasharray="5 5" label={{ value: 'Coast', position: 'right', fontSize: 11 }} />
-          )}
-          {data.fire_milestones.barista_fire.achievable && (
-            <ReferenceLine y={data.fire_milestones.barista_fire.target_amount} stroke="#8b5cf6" strokeDasharray="5 5" label={{ value: 'Barista', position: 'right', fontSize: 11 }} />
-          )}
-          {data.fire_milestones.fat_fire.target_amount < (chartData[chartData.length - 1]?.p90 || 0) * 1.2 && (
-            <ReferenceLine y={data.fire_milestones.fat_fire.target_amount} stroke="#f59e0b" strokeDasharray="5 5" label={{ value: 'Fat', position: 'right', fontSize: 11 }} />
+
+          {/* Predicted FIRE target line (blue) — show if within visible range */}
+          {fm.predicted_fire_target < maxP90 * 1.5 && (
+            <ReferenceLine
+              y={fm.predicted_fire_target}
+              stroke="#2563eb"
+              strokeWidth={2}
+              strokeDasharray="8 4"
+              label={{ value: 'Predicted FIRE', position: 'right', fontSize: 11, fill: '#1d4ed8' }}
+            />
           )}
         </AreaChart>
       </ResponsiveContainer>

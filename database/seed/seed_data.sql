@@ -2,6 +2,7 @@
 -- Run this AFTER 001_create_tables.sql in Supabase SQL Editor
 
 -- Clear existing sample data (idempotent)
+DELETE FROM retirement_lifestyles WHERE profile_id IN (SELECT id FROM profiles WHERE is_sample = true);
 DELETE FROM assets WHERE profile_id IN (SELECT id FROM profiles WHERE is_sample = true);
 DELETE FROM debts WHERE profile_id IN (SELECT id FROM profiles WHERE is_sample = true);
 DELETE FROM expenses WHERE profile_id IN (SELECT id FROM profiles WHERE is_sample = true);
@@ -115,3 +116,32 @@ INSERT INTO assets (profile_id, type, balance) VALUES
   ('33333333-3333-3333-3333-333333333333', 'roth_ira', 35000),
   ('33333333-3333-3333-3333-333333333333', 'brokerage', 52000),
   ('33333333-3333-3333-3333-333333333333', 'savings', 25000);
+
+-- ============================================
+-- RETIREMENT LIFESTYLES
+-- Goal = what they want; Predicted = what trajectory supports
+-- ============================================
+
+-- Alex — goal (~$4,100/mo)
+INSERT INTO retirement_lifestyles (profile_id, lifestyle_type, housing_monthly, food_monthly, healthcare_monthly, travel_annual, leisure_monthly, transportation_monthly, utilities_monthly, other_monthly)
+VALUES ('11111111-1111-1111-1111-111111111111', 'goal', 2000, 600, 400, 3000, 200, 300, 150, 200);
+
+-- Alex — predicted (~$2,520/mo, ~60% of goal)
+INSERT INTO retirement_lifestyles (profile_id, lifestyle_type, housing_monthly, food_monthly, healthcare_monthly, travel_annual, leisure_monthly, transportation_monthly, utilities_monthly, other_monthly)
+VALUES ('11111111-1111-1111-1111-111111111111', 'predicted', 1200, 400, 300, 1200, 100, 200, 120, 100);
+
+-- Jordan — goal (~$5,647/mo)
+INSERT INTO retirement_lifestyles (profile_id, lifestyle_type, housing_monthly, food_monthly, healthcare_monthly, travel_annual, leisure_monthly, transportation_monthly, utilities_monthly, other_monthly)
+VALUES ('22222222-2222-2222-2222-222222222222', 'goal', 2500, 800, 500, 8000, 400, 350, 180, 250);
+
+-- Jordan — predicted (~$4,417/mo, ~80% of goal)
+INSERT INTO retirement_lifestyles (profile_id, lifestyle_type, housing_monthly, food_monthly, healthcare_monthly, travel_annual, leisure_monthly, transportation_monthly, utilities_monthly, other_monthly)
+VALUES ('22222222-2222-2222-2222-222222222222', 'predicted', 2000, 650, 400, 5000, 300, 300, 150, 200);
+
+-- Morgan — goal (~$8,800/mo)
+INSERT INTO retirement_lifestyles (profile_id, lifestyle_type, housing_monthly, food_monthly, healthcare_monthly, travel_annual, leisure_monthly, transportation_monthly, utilities_monthly, other_monthly)
+VALUES ('33333333-3333-3333-3333-333333333333', 'goal', 4000, 1000, 600, 15000, 800, 500, 250, 400);
+
+-- Morgan — predicted (~$7,670/mo, ~90% of goal)
+INSERT INTO retirement_lifestyles (profile_id, lifestyle_type, housing_monthly, food_monthly, healthcare_monthly, travel_annual, leisure_monthly, transportation_monthly, utilities_monthly, other_monthly)
+VALUES ('33333333-3333-3333-3333-333333333333', 'predicted', 3500, 900, 550, 12000, 700, 450, 220, 350);

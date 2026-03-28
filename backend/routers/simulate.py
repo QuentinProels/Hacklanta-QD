@@ -19,7 +19,7 @@ async def simulate(req: SimulateRequest):
         monthly_savings_rate=req.monthly_savings_rate,
         employer_match_pct=req.employer_match_pct,
         safe_withdrawal_rate=req.safe_withdrawal_rate,
-        desired_monthly_retirement_income=req.desired_monthly_retirement_income,
-        lean_monthly_expenses=req.lean_monthly_expenses,
+        goal_monthly_retirement_income=req.goal_monthly_retirement_income,
+        predicted_monthly_retirement_income=req.predicted_monthly_retirement_income,
     )
     return result

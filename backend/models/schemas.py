@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 from typing import Optional
 
 
@@ -13,6 +13,31 @@ class CurrentAssets(BaseModel):
     savings: float
 
 
+class RetirementLifestyle(BaseModel):
+    housing_monthly: float = 0
+    food_monthly: float = 0
+    healthcare_monthly: float = 0
+    travel_annual: float = 0
+    leisure_monthly: float = 0
+    transportation_monthly: float = 0
+    utilities_monthly: float = 0
+    other_monthly: float = 0
+
+    @computed_field
+    @property
+    def total_monthly(self) -> float:
+        return (
+            self.housing_monthly
+            + self.food_monthly
+            + self.healthcare_monthly
+            + self.travel_annual / 12
+            + self.leisure_monthly
+            + self.transportation_monthly
+            + self.utilities_monthly
+            + self.other_monthly
+        )
+
+
 class SimulateRequest(BaseModel):
     current_age: int
     retirement_target_age: int = 55
@@ -25,19 +50,22 @@ class SimulateRequest(BaseModel):
     monthly_savings_rate: float
     employer_match_pct: float = 4.0
     safe_withdrawal_rate: float = 0.04
-    desired_monthly_retirement_income: float = 5000.0
-    lean_monthly_expenses: float = 2500.0
+    goal_monthly_retirement_income: float = 5000.0
+    predicted_monthly_retirement_income: float = 3500.0
 
 
-class FireMilestone(BaseModel):
-    age: Optional[int]
-    target_amount: float
-    achievable: bool
+class FireResult(BaseModel):
+    goal_fire_age: Optional[int] = None
+    goal_fire_target: float
+    goal_achievable: bool
+    predicted_fire_age: Optional[int] = None
+    predicted_fire_target: float
+    predicted_achievable: bool
 
 
 class SimulateResponse(BaseModel):
     percentiles: dict[str, list[dict]]
-    fire_milestones: dict[str, FireMilestone]
+    fire_milestones: FireResult
     retirement_readiness_score: int
     gap_analysis: dict
 

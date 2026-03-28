@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getBudgetAnalysis, runSimulation } from '@/lib/api';
 import type { FullProfile, BudgetAnalysisResult, SimulationResult } from '@/lib/types';
+import { lifestyleTotalMonthly } from '@/lib/types';
 import CashFlowBar from '@/components/charts/CashFlowBar';
 import careerPaths from '@/data/career_paths.json';
 import type { CareerPaths } from '@/lib/types';
@@ -27,7 +28,7 @@ export default function TabOverview({ data }: { data: FullProfile }) {
   const [sim, setSim] = useState<SimulationResult | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const { profile, expenses, debts, assets } = data;
+  const { profile, expenses, debts, assets, retirementLifestyles } = data;
 
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
   const totalDebtPayments = debts.reduce((s, d) => s + d.min_payment, 0);
@@ -64,8 +65,12 @@ export default function TabOverview({ data }: { data: FullProfile }) {
             monthly_savings_rate: Math.max(0, surplus),
             employer_match_pct: profile.employer_match_pct,
             safe_withdrawal_rate: profile.safe_withdrawal_rate,
-            desired_monthly_retirement_income: profile.desired_monthly_retirement_income,
-            lean_monthly_expenses: totalExpenses * 0.7,
+            goal_monthly_retirement_income: retirementLifestyles?.goal
+              ? lifestyleTotalMonthly(retirementLifestyles.goal)
+              : profile.desired_monthly_retirement_income || 5000,
+            predicted_monthly_retirement_income: retirementLifestyles?.predicted
+              ? lifestyleTotalMonthly(retirementLifestyles.predicted)
+              : (profile.desired_monthly_retirement_income || 5000) * 0.7,
           }),
         ]);
 
@@ -101,19 +106,26 @@ export default function TabOverview({ data }: { data: FullProfile }) {
         {/* FIRE Timeline Summary */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <p className="text-sm font-medium text-gray-600 mb-4">FIRE Timeline</p>
-          <div className="grid grid-cols-2 gap-4">
-            {sim && Object.entries(sim.fire_milestones).map(([key, milestone]) => {
-              const label = key.replace('_fire', '').replace('_', ' ');
-              return (
-                <div key={key} className="text-center">
-                  <p className="text-xs text-gray-500 capitalize">{label} FIRE</p>
-                  <p className={`text-2xl font-bold ${milestone.achievable ? 'text-gray-900' : 'text-gray-300'}`}>
-                    {milestone.achievable && milestone.age ? `Age ${milestone.age}` : 'N/A'}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
+          {sim && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-3 rounded-lg bg-amber-50">
+                <p className="text-xs text-amber-600 font-medium">Goal Lifestyle</p>
+                <p className={`text-2xl font-bold ${sim.fire_milestones.goal_achievable ? 'text-gray-900' : 'text-gray-300'}`}>
+                  {sim.fire_milestones.goal_achievable && sim.fire_milestones.goal_fire_age
+                    ? `Retire at ${sim.fire_milestones.goal_fire_age}`
+                    : 'N/A'}
+                </p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-blue-50">
+                <p className="text-xs text-blue-600 font-medium">Predicted Lifestyle</p>
+                <p className={`text-2xl font-bold ${sim.fire_milestones.predicted_achievable ? 'text-gray-900' : 'text-gray-300'}`}>
+                  {sim.fire_milestones.predicted_achievable && sim.fire_milestones.predicted_fire_age
+                    ? `Retire at ${sim.fire_milestones.predicted_fire_age}`
+                    : 'N/A'}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

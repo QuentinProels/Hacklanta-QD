@@ -3,14 +3,15 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import type { FullProfile } from '@/lib/types';
+import type { FullProfile, RetirementLifestyle } from '@/lib/types';
 import TabOverview from '@/components/dashboard/TabOverview';
 import TabFire from '@/components/dashboard/TabFire';
 import TabBudgetDebt from '@/components/dashboard/TabBudgetDebt';
 import TabCareerPath from '@/components/dashboard/TabCareerPath';
 import TabLifetimeCashflow from '@/components/dashboard/TabLifetimeCashflow';
-
-const TABS = ['Overview', 'Career Path', 'Lifetime Cashflow', 'FIRE Projections', 'Budget & Debt'] as const;
+import TabRetirementLifestyle from '@/components/dashboard/TabRetirementLifestyle';
+        
+const TABS = ['Overview', 'Career Path', 'Retirement Lifestyle', 'FIRE Projections', 'Lifetime Cashflow', 'Budget & Debt', 'AI Insights'] as const;
 type Tab = typeof TABS[number];
 
 function DashboardContent() {
@@ -34,17 +35,22 @@ function DashboardContent() {
       return;
     }
 
-    const [{ data: expenses }, { data: debts }, { data: assets }] = await Promise.all([
+    const [{ data: expenses }, { data: debts }, { data: assets }, { data: lifestyles }] = await Promise.all([
       supabase.from('expenses').select('*').eq('profile_id', profile.id),
       supabase.from('debts').select('*').eq('profile_id', profile.id),
       supabase.from('assets').select('*').eq('profile_id', profile.id),
+      supabase.from('retirement_lifestyles').select('*').eq('profile_id', profile.id),
     ]);
+
+    const goalLifestyle = (lifestyles || []).find((l: RetirementLifestyle) => l.lifestyle_type === 'goal') || null;
+    const predictedLifestyle = (lifestyles || []).find((l: RetirementLifestyle) => l.lifestyle_type === 'predicted') || null;
 
     setData({
       profile,
       expenses: expenses || [],
       debts: debts || [],
       assets: assets || [],
+      retirementLifestyles: { goal: goalLifestyle, predicted: predictedLifestyle },
     });
     setLoading(false);
   };
@@ -113,6 +119,7 @@ function DashboardContent() {
         {activeTab === 'Overview' && <TabOverview data={data} />}
         {activeTab === 'Career Path' && <TabCareerPath data={data} onSaved={loadProfile} />}
         {activeTab === 'Lifetime Cashflow' && <TabLifetimeCashflow data={data} />}
+        {activeTab === 'Retirement Lifestyle' && <TabRetirementLifestyle data={data} onSaved={loadProfile} />}
         {activeTab === 'FIRE Projections' && <TabFire data={data} />}
         {activeTab === 'Budget & Debt' && <TabBudgetDebt data={data} />}
       </main>

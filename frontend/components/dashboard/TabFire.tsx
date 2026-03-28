@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { runSimulation } from '@/lib/api';
 import type { FullProfile, SimulationResult } from '@/lib/types';
+import { lifestyleTotalMonthly } from '@/lib/types';
 import FanChart from '@/components/charts/FanChart';
 import careerPaths from '@/data/career_paths.json';
 import type { CareerPaths } from '@/lib/types';
@@ -30,12 +31,20 @@ export default function TabFire({ data }: { data: FullProfile }) {
   const [extraSavings, setExtraSavings] = useState(0);
   const [retireAge, setRetireAge] = useState(data.profile.retirement_target_age);
 
-  const { profile, expenses, debts, assets } = data;
+  const { profile, expenses, debts, assets, retirementLifestyles } = data;
 
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
   const totalDebtPayments = debts.reduce((s, d) => s + d.min_payment, 0);
   const totalDebt = debts.reduce((s, d) => s + d.balance, 0);
   const surplus = profile.monthly_take_home - totalExpenses - totalDebtPayments;
+
+  // Get retirement income targets from lifestyle data, or fall back to profile defaults
+  const goalMonthly = retirementLifestyles?.goal
+    ? lifestyleTotalMonthly(retirementLifestyles.goal)
+    : profile.desired_monthly_retirement_income || 5000;
+  const predictedMonthly = retirementLifestyles?.predicted
+    ? lifestyleTotalMonthly(retirementLifestyles.predicted)
+    : goalMonthly * 0.7;
 
   const fetchSimulation = useCallback(async () => {
     setLoading(true);
@@ -62,8 +71,8 @@ export default function TabFire({ data }: { data: FullProfile }) {
         monthly_savings_rate: adjustedSavings,
         employer_match_pct: profile.employer_match_pct,
         safe_withdrawal_rate: profile.safe_withdrawal_rate,
-        desired_monthly_retirement_income: profile.desired_monthly_retirement_income,
-        lean_monthly_expenses: totalExpenses * 0.7,
+        goal_monthly_retirement_income: goalMonthly,
+        predicted_monthly_retirement_income: predictedMonthly,
       });
       setSim(result as SimulationResult);
     } catch (err) {
@@ -73,9 +82,11 @@ export default function TabFire({ data }: { data: FullProfile }) {
   }, [data, extraIncome, extraSavings, retireAge]);
 
   useEffect(() => {
-    const timeout = setTimeout(fetchSimulation, 500); // debounce
+    const timeout = setTimeout(fetchSimulation, 500);
     return () => clearTimeout(timeout);
   }, [fetchSimulation]);
+
+  const fm = sim?.fire_milestones;
 
   return (
     <div className="space-y-8">
@@ -89,27 +100,80 @@ export default function TabFire({ data }: { data: FullProfile }) {
         ) : null}
       </div>
 
-      {/* FIRE Milestones */}
-      {sim && (
-        <div className="grid md:grid-cols-4 gap-4">
-          {[
-            { key: 'lean_fire', label: 'Lean FIRE', desc: '25x bare-minimum annual expenses', color: 'border-emerald-400 bg-emerald-50' },
-            { key: 'coast_fire', label: 'Coast FIRE', desc: 'Growth alone covers retirement by 65', color: 'border-blue-400 bg-blue-50' },
-            { key: 'barista_fire', label: 'Barista FIRE', desc: 'Part-time job covers the gap', color: 'border-purple-400 bg-purple-50' },
-            { key: 'fat_fire', label: 'Fat FIRE', desc: '25x desired lifestyle expenses', color: 'border-amber-400 bg-amber-50' },
-          ].map(({ key, label, desc, color }) => {
-            const m = sim.fire_milestones[key as keyof typeof sim.fire_milestones];
-            return (
-              <div key={key} className={`rounded-xl border-2 p-4 ${color}`}>
-                <p className="text-sm font-semibold text-gray-700">{label}</p>
-                <p className="text-3xl font-bold text-gray-900 my-1">
-                  {m.achievable && m.age ? `Age ${m.age}` : 'N/A'}
-                </p>
-                <p className="text-xs text-gray-500">{desc}</p>
-                <p className="text-xs text-gray-400 mt-1">Target: ${(m.target_amount / 1000).toFixed(0)}k</p>
-              </div>
-            );
-          })}
+      {/* FIRE Milestones — Goal vs Predicted */}
+      {fm && (
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Goal FIRE */}
+          <div className={`rounded-xl border-2 p-6 ${fm.goal_achievable ? 'border-amber-400 bg-amber-50' : 'border-gray-300 bg-gray-50'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold text-amber-700">Goal Lifestyle FIRE</p>
+              <span className="text-xs bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full">
+                ${goalMonthly.toLocaleString()}/mo
+              </span>
+            </div>
+            <p className={`text-4xl font-bold my-2 ${fm.goal_achievable ? 'text-gray-900' : 'text-gray-300'}`}>
+              {fm.goal_achievable && fm.goal_fire_age ? `Retire at ${fm.goal_fire_age}` : 'Not achievable'}
+            </p>
+            <p className="text-xs text-gray-500">
+              Target: ${(fm.goal_fire_target / 1_000_000).toFixed(1)}M invested (25x ${(goalMonthly * 12).toLocaleString()}/yr)
+            </p>
+            {fm.goal_achievable && fm.goal_fire_age && (
+              <p className="text-sm text-amber-700 mt-2">
+                {fm.goal_fire_age - profile.current_age} years from now
+              </p>
+            )}
+          </div>
+
+          {/* Predicted FIRE */}
+          <div className={`rounded-xl border-2 p-6 ${fm.predicted_achievable ? 'border-blue-400 bg-blue-50' : 'border-gray-300 bg-gray-50'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold text-blue-700">Predicted Lifestyle FIRE</p>
+              <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">
+                ${predictedMonthly.toLocaleString()}/mo
+              </span>
+            </div>
+            <p className={`text-4xl font-bold my-2 ${fm.predicted_achievable ? 'text-gray-900' : 'text-gray-300'}`}>
+              {fm.predicted_achievable && fm.predicted_fire_age ? `Retire at ${fm.predicted_fire_age}` : 'Not achievable'}
+            </p>
+            <p className="text-xs text-gray-500">
+              Target: ${(fm.predicted_fire_target / 1_000_000).toFixed(1)}M invested (25x ${(predictedMonthly * 12).toLocaleString()}/yr)
+            </p>
+            {fm.predicted_achievable && fm.predicted_fire_age && (
+              <p className="text-sm text-blue-700 mt-2">
+                {fm.predicted_fire_age - profile.current_age} years from now
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Comparison insight */}
+      {fm && fm.goal_achievable && fm.predicted_achievable && fm.goal_fire_age && fm.predicted_fire_age && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+          <p className="text-sm text-green-700">
+            Your predicted lifestyle lets you retire <strong>{fm.goal_fire_age - fm.predicted_fire_age} years earlier</strong> than
+            your goal lifestyle. Adjusting your retirement expectations could mean the difference between retiring at{' '}
+            <strong>{fm.predicted_fire_age}</strong> vs <strong>{fm.goal_fire_age}</strong>.
+          </p>
+        </div>
+      )}
+
+      {fm && !fm.goal_achievable && fm.predicted_achievable && fm.predicted_fire_age && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-center">
+          <p className="text-sm text-yellow-700">
+            Your goal lifestyle isn&apos;t achievable on your current trajectory, but your predicted lifestyle
+            would let you retire at <strong>{fm.predicted_fire_age}</strong>. Consider adjusting your
+            retirement goals on the Retirement Lifestyle tab.
+          </p>
+        </div>
+      )}
+
+      {fm && !fm.goal_achievable && !fm.predicted_achievable && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+          <p className="text-sm text-red-700">
+            Neither your goal nor predicted retirement lifestyle is achievable on your current trajectory.
+            Use the sliders below to explore what changes could make retirement possible.
+          </p>
         </div>
       )}
 
@@ -140,19 +204,19 @@ export default function TabFire({ data }: { data: FullProfile }) {
       </div>
 
       {/* Gap Analysis */}
-      {sim && sim.gap_analysis?.fat_fire_by_50 && (
+      {sim && sim.gap_analysis?.goal_fire_by_50 && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h3 className="text-lg font-semibold mb-2">Gap Analysis</h3>
           <p className="text-sm text-gray-600">
-            To reach Fat FIRE by 50, you&apos;d need to reach a salary of approximately{' '}
+            To reach your goal lifestyle FIRE by 50, you&apos;d need to reach a salary of approximately{' '}
             <span className="font-bold">
-              ${Object.values(sim.gap_analysis.fat_fire_by_50.required_salary_by_age || {})[1]?.toLocaleString() || 'N/A'}
+              ${Object.values(sim.gap_analysis.goal_fire_by_50.required_salary_by_age || {})[1]?.toLocaleString() || 'N/A'}
             </span>{' '}
-            by age {Object.keys(sim.gap_analysis.fat_fire_by_50.required_salary_by_age || {})[1] || '?'}.
+            by age {Object.keys(sim.gap_analysis.goal_fire_by_50.required_salary_by_age || {})[1] || '?'}.
           </p>
-          {sim.gap_analysis.fat_fire_by_50.suggested_roles && (
+          {sim.gap_analysis.goal_fire_by_50.suggested_roles && (
             <p className="text-sm text-gray-500 mt-2">
-              Roles that typically pay this: {sim.gap_analysis.fat_fire_by_50.suggested_roles.join(', ')}
+              Roles that typically pay this: {sim.gap_analysis.goal_fire_by_50.suggested_roles.join(', ')}
             </p>
           )}
         </div>
