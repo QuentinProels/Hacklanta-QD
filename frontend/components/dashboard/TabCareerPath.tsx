@@ -20,11 +20,16 @@ export default function TabCareerPath({ data, onSaved }: Props) {
   // Build initial points: use saved progression, or default to flat (current salary forever)
   const buildInitialPoints = (): SalaryPoint[] => {
     if (profile.salary_progression && profile.salary_progression.length > 0) {
-      return profile.salary_progression.map((sp) => ({
-        age: sp.age,
-        salary: sp.salary,
-        label: sp.label || '',
-      }));
+      // Filter to labeled milestones only — interpolated year-by-year points
+      // (saved for simulation) should not show as draggable chart bubbles.
+      const milestones = profile.salary_progression.filter((sp) => sp.label);
+      if (milestones.length > 0) {
+        return milestones.map((sp) => ({
+          age: sp.age,
+          salary: sp.salary,
+          label: sp.label || '',
+        }));
+      }
     }
     // Default: flat salary — just one point at current age
     return [
