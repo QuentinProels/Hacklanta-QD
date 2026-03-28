@@ -60,6 +60,8 @@ export default function OnboardPage() {
   const [saving, setSaving] = useState(false);
 
   // Step 1: Career
+  const [currentAge, setCurrentAge] = useState(25);
+  const [ageInput, setAgeInput] = useState('25');
   const [careerKey, setCareerKey] = useState('swe');
   const [levelIndex, setLevelIndex] = useState(0);
   const [salaryPoints, setSalaryPoints] = useState<SalaryPoint[]>([]);
@@ -86,21 +88,20 @@ export default function OnboardPage() {
   const selectedLevel = selectedCareer?.progression[levelIndex];
   const salary = selectedLevel?.median || 0;
   const monthlyTakeHome = Math.round(salary * 0.72 / 12);
-  const currentAge = 22 + (selectedLevel?.years_range[0] || 0);
 
-  // Build salary progression points from career path starting at selected level
+  // Build salary progression points from career path starting at user's actual age
   useEffect(() => {
-    if (!selectedCareer) return;
-    const baseAge = 22;
+    if (!selectedCareer || !selectedLevel) return;
+    const currentLevelStartYears = selectedLevel.years_range[0];
     const pts: SalaryPoint[] = selectedCareer.progression
       .filter((_, i) => i >= levelIndex)
       .map((level) => ({
-        age: baseAge + level.years_range[0],
+        age: currentAge + (level.years_range[0] - currentLevelStartYears),
         salary: level.median,
         label: level.level,
       }));
     setSalaryPoints(pts);
-  }, [careerKey, levelIndex]);
+  }, [careerKey, levelIndex, currentAge]);
 
   const handleExpensePreset = (preset: 'frugal' | 'moderate' | 'comfortable') => {
     setExpensePreset(preset);
@@ -196,6 +197,22 @@ export default function OnboardPage() {
           <div>
             <h2 className="text-2xl font-bold mb-2">Choose Your Career Path</h2>
             <p className="text-gray-500 mb-6">This determines your salary progression curve.</p>
+            <div className="flex items-center gap-4 mb-4">
+              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Your current age</label>
+              <input
+                type="number"
+                value={ageInput}
+                onChange={(e) => setAgeInput(e.target.value)}
+                onBlur={(e) => {
+                  const val = Math.max(16, Math.min(115, Number(e.target.value) || 25));
+                  setCurrentAge(val);
+                  setAgeInput(String(val));
+                }}
+                min={16}
+                max={115}
+                className="w-12 border border-gray-300 rounded-lg px-2 py-0.5 text-center text-base text-gray-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
             <select
               value={careerKey}
               onChange={(e) => { setCareerKey(e.target.value); setLevelIndex(0); }}
@@ -218,9 +235,9 @@ export default function OnboardPage() {
             </select>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <p className="text-sm text-blue-700">
-                <strong>Estimated salary:</strong> ${salary.toLocaleString()}/yr |
-                <strong> Take-home:</strong> ~${monthlyTakeHome.toLocaleString()}/mo |
-                <strong> Starting age:</strong> {currentAge}
+                <strong>Estimated salary:</strong> ${salary.toLocaleString()}/yr &nbsp;|&nbsp;
+                <strong>Take-home:</strong> ~${monthlyTakeHome.toLocaleString()}/mo &nbsp;|&nbsp;
+                <strong>Graph starts at age:</strong> {currentAge}
               </p>
             </div>
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { XCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { getBudgetAnalysis, runSimulation } from '@/lib/api';
 import type { FullProfile, BudgetAnalysisResult, SimulationResult } from '@/lib/types';
 import { lifestyleTotalMonthly } from '@/lib/types';
@@ -156,9 +157,13 @@ export default function TabOverview({ data }: { data: FullProfile }) {
                     : 'bg-green-50 border border-green-200'
                 }`}
               >
-                <span className="text-lg">
-                  {alert.severity === 'red' ? '\u{1F534}' : alert.severity === 'yellow' ? '\u{1F7E1}' : '\u{1F7E2}'}
-                </span>
+                {alert.severity === 'red' ? (
+                  <XCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                ) : alert.severity === 'yellow' ? (
+                  <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
+                ) : (
+                  <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+                )}
                 <p className="text-sm text-gray-700">{alert.message}</p>
               </div>
             ))}
