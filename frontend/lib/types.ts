@@ -151,3 +151,15 @@ export interface CareerPath {
 export interface CareerPaths {
   [key: string]: CareerPath;
 }
+
+export interface LifetimeCashflowPoint {
+  age: number;
+  grossIncome: number;
+  takeHome: number;
+  employerMatch: number;
+  spending: number;
+  debtPayments: number;
+  netSavings: number;
+  cumulativeSavings: number;
+  isRetired: boolean;
+}

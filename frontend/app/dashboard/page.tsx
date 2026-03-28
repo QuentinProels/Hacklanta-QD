@@ -7,11 +7,11 @@ import type { FullProfile, RetirementLifestyle } from '@/lib/types';
 import TabOverview from '@/components/dashboard/TabOverview';
 import TabFire from '@/components/dashboard/TabFire';
 import TabBudgetDebt from '@/components/dashboard/TabBudgetDebt';
-import TabAiInsights from '@/components/dashboard/TabAiInsights';
 import TabCareerPath from '@/components/dashboard/TabCareerPath';
+import TabLifetimeCashflow from '@/components/dashboard/TabLifetimeCashflow';
 import TabRetirementLifestyle from '@/components/dashboard/TabRetirementLifestyle';
-
-const TABS = ['Overview', 'Career Path', 'Retirement Lifestyle', 'FIRE Projections', 'Budget & Debt', 'AI Insights'] as const;
+        
+const TABS = ['Overview', 'Career Path', 'Retirement Lifestyle', 'FIRE Projections', 'Lifetime Cashflow', 'Budget & Debt', 'AI Insights'] as const;
 type Tab = typeof TABS[number];
 
 function DashboardContent() {
@@ -118,10 +118,10 @@ function DashboardContent() {
       <main className="max-w-6xl mx-auto px-6 py-8">
         {activeTab === 'Overview' && <TabOverview data={data} />}
         {activeTab === 'Career Path' && <TabCareerPath data={data} onSaved={loadProfile} />}
+        {activeTab === 'Lifetime Cashflow' && <TabLifetimeCashflow data={data} />}
         {activeTab === 'Retirement Lifestyle' && <TabRetirementLifestyle data={data} onSaved={loadProfile} />}
         {activeTab === 'FIRE Projections' && <TabFire data={data} />}
         {activeTab === 'Budget & Debt' && <TabBudgetDebt data={data} />}
-        {activeTab === 'AI Insights' && <TabAiInsights data={data} />}
       </main>
     </div>
   );
