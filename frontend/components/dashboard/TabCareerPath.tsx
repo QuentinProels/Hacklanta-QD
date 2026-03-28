@@ -70,12 +70,45 @@ export default function TabCareerPath({ data, onSaved }: Props) {
     setSaved(false);
   };
 
+  // Recompute each promotion milestone's salary by compounding from the previous
+  // dot + 12% promotion bump. First dot stays anchored.
+  const recalcWithRaise = (pts: SalaryPoint[], raisePct: number): SalaryPoint[] => {
+    const sorted = [...pts].sort((a, b) => a.age - b.age);
+    const raise = raisePct / 100;
+    const result: SalaryPoint[] = [sorted[0]];
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = result[i - 1];
+      const yearsBetween = sorted[i].age - prev.age;
+      const compounded = Math.round(prev.salary * Math.pow(1 + raise, yearsBetween));
+      result.push({ ...sorted[i], salary: Math.round(compounded * 1.12) });
+    }
+    return result;
+  };
+
+  // Bake the annual raise into year-by-year points between milestones so the
+  // simulation gets the full compounded curve, not just the milestone dots.
+  const bakeRaiseIntoProgression = (pts: SalaryPoint[], raisePct: number) => {
+    const sorted = [...pts].sort((a, b) => a.age - b.age);
+    const raise = raisePct / 100;
+    const result: { age: number; salary: number; label?: string }[] = [];
+    for (let i = 0; i < sorted.length; i++) {
+      const current = sorted[i];
+      const next = sorted[i + 1];
+      result.push({ age: current.age, salary: current.salary, label: current.label });
+      if (next) {
+        for (let age = current.age + 1; age < next.age; age++) {
+          const years = age - current.age;
+          result.push({ age, salary: Math.round(current.salary * Math.pow(1 + raise, years)) });
+        }
+      }
+    }
+    return result;
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      const progression = points
-        .sort((a, b) => a.age - b.age)
-        .map(({ age, salary, label }) => ({ age, salary, label }));
+      const progression = bakeRaiseIntoProgression(points, annualRaisePct);
 
       const { error } = await supabase
         .from('profiles')
@@ -231,7 +264,13 @@ export default function TabCareerPath({ data, onSaved }: Props) {
           max={10}
           step={0.5}
           value={annualRaisePct}
-          onChange={(e) => setAnnualRaisePct(Number(e.target.value))}
+          onChange={(e) => {
+            const pct = Number(e.target.value);
+            setAnnualRaisePct(pct);
+            setPoints((prev) => recalcWithRaise(prev, pct));
+            setDirty(true);
+            setSaved(false);
+          }}
           className="w-full accent-blue-600"
         />
         <div className="flex justify-between text-xs text-gray-400 mt-1">
