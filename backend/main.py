@@ -10,7 +10,7 @@ app = FastAPI(title="CoastLine API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "https://coast-line-3s96kaz8b-streetlamp05s-projects.vercel.app", "https://coast-line-sandy.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
